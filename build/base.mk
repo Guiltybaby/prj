@@ -17,24 +17,27 @@ D := .d
 % : RCCS/s.%
 
 
-COMPILER:=arm-none-eabi
-A_CC := arm-none-eabi-gcc
-A_CPP := arm-none-eabi-g++
-LD := arm-none-eabi-ld
-LC := arm-none-eabi-ld -g -shared
+#COMPILER:=arm-none-eabi-
+A_CC := $(COMPILER)gcc
+A_CPP := $(COMPILER)g++
+LD := $(COMPILER)g++
+LC := $(COMPILER)g++ -g -shared
 
 ifneq ($(SPLINTDIR),)
 //PARSER := $(SPLINTDIR)/splint
 endif
 
-STD_LIB := c m gcc
+STD_LIB := c m gcc   #
 
-COMPILER_HEADER:=$(TOOLCHAINS_PATH)/arm-none-eabi/include
-COMPILER_LIB:=$(TOOLCHAINS_PATH)/arm-none-eabi/lib
-COMPILER_GCC:=$(TOOLCHAINS_PATH)/lib/gcc/arm-none-eabi/4.8.4
+#COMPILER_HEADER:=$(TOOLCHAINS_PATH)/arm-none-eabi/include
+#COMPILER_GCC:=$(TOOLCHAINS_PATH)/lib/gcc/arm-none-eabi/4.8.4
+#COMPILER_LIB:=$(TOOLCHAINS_PATH)/arm-none-eabi/lib
+COMPILER_HEADER:=/usr/lib/include
+COMPILER_LIB:=/usr/lib/i386-linux-gnu
+COMPILER_GCC:=/usr/lib/gcc/i686-linux-gnu/4.8
 MODULE := $(notdir $(CURDIR))
 SRCDIR := src
-INCDIR := inc $(DEP_INCS)
+INCDIR := inc inc/private $(DEP_INCS)
 OUTDIR := $(PROJECTDIR)/out/obj/$(MODULE)
 OBJDIR := $(PROJECTDIR)/out/obj/$(MODULE)/intermediates
 TMPDIR := $(PROJECTDIR)/out/obj/$(MODULE)/intermediates
@@ -48,12 +51,20 @@ vpath %$(CPP)  	./$(SRCDIR)/
 vpath %$O  		$(OBJDIR)/
 vpath %$D  		$(TMPDIR)/
 
-LD_OPTS += -nostdlib \
+LD_CRTBEGIN:=$(COMPILER_GCC)/crtbegin.o
+LD_CRT1:=$(COMPILER_LIB)/crt1.o
+LD_CRT0:=$(COMPILER_LIB)/crt0.o
+LD_CRTI:=$(COMPILER_LIB)/crti.o
+LD_CRTN:=$(COMPILER_LIB)/crtn.o
+LD_CRTEND:=$(COMPILER_GCC)/crtend.o
+
+LD_OPTS +=  -nostdlib \
 			$(LOCAL_GLOBAL_DEFINATION) \
-			-rpath-link=$(COMPILER_LIB) \
-			-rpath-link=$(COMPILER_GCC) \
+			-Wl,-rpath-link=$(COMPILER_LIB) \
+			-Wl,-rpath-link=$(COMPILER_GCC) \
 			$(addprefix -L,$(COMPILER_LIB)) \
 			$(addprefix -L,$(COMPILER_GCC))
+
 LD_OPTS+= $(addprefix --wrap , $(WRAP_FUN))
 
 SYSINCDIR:=#$(COMPILER_HEADER)
@@ -80,16 +91,16 @@ endif
 
 
 %$O :  %$C
-	$(A_CC) $(CFLAGS) $(LOCAL_GLOBAL_DEFINATION) $< -o $(OBJDIR)/$@
+	@$(A_CC) $(CFLAGS) $(LOCAL_GLOBAL_DEFINATION) $< -o $(OBJDIR)/$@
 
 %$O :  %$(CPP)
-	$(A_CPP) $(CFLAGS) $(LOCAL_GLOBAL_DEFINATION) $< -o $(OBJDIR)/$@
+	@$(A_CPP) $(CFLAGS) $(LOCAL_GLOBAL_DEFINATION) $< -o $(OBJDIR)/$@
 
 %$O :  %$S
-	$(A_CC) $(CFLAGS) $(LOCAL_GLOBAL_DEFINATION) $< -o $(OBJDIR)/$@
+	@$(A_CC) $(CFLAGS) $(LOCAL_GLOBAL_DEFINATION) $< -o $(OBJDIR)/$@
 
 %$D : %$C
-	$(A_CC) $(CFLAGS) $(LOCAL_GLOBAL_DEFINATION) $< -M -MF $(TMPDIR)/$@
+	@$(A_CC) $(CFLAGS) $(LOCAL_GLOBAL_DEFINATION) $< -M -MF $(TMPDIR)/$@
 
 
 .PHONY : default clean_all clean all depends obj parse
@@ -130,11 +141,18 @@ test :
 
 ifeq ($(TARGET_SUFFIX),.exe)
 $(TARGET) : $(OBJS) #$(basename $(DEP_LIBS:lib%=%))
-	$(LD) -o $(basename $@) $(LD_OPTS) $(addprefix $(OBJDIR)/, $(OBJS))  \
+	$(LD) -o $(basename $@) \
+	$(LD_CRT1) \
+	$(LD_CRTI) \
+	$(LD_CRTBEGIN) \
+	$(LD_OPTS) $(addprefix $(OBJDIR)/, $(OBJS))  \
 	$(addprefix -L,$(OUTLIBDIR)) \
 	$(addprefix -l,$(basename $(DEP_LIBS:lib%=%))) \
-	$(addprefix -l,$(STD_LIB)) 
-	@-cp -f $(basename $@) $(INSTALLDIR)
+	$(addprefix -l,$(STD_LIB)) \
+	$(LD_CRTN) \
+	$(LD_CRTEND)
+	@cp $(basename $@) $(INSTALLDIR)
+	@chmod 777 -R $(INSTALLDIR)
 
 else ifeq ($(TARGET_SUFFIX),.so)
 $(TARGET) : $(OBJS)
@@ -143,7 +161,7 @@ $(TARGET) : $(OBJS)
 	@-cp -f $@ $(INSTALLDIR)
 else ifeq ($(TARGET_SUFFIX),.a)
 $(TARGET) : $(OBJS)
-	$(AR) -r $@ $(addprefix $(OBJDIR)/, $(OBJS))
+	@$(AR) -r $@ $(addprefix $(OBJDIR)/, $(OBJS))
 	@-cp -f $@ $(OUTLIBDIR)
 	@-cp -f $@ $(INSTALLDIR)
 endif

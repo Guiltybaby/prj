@@ -13,9 +13,9 @@ int sl_log_printf(int prio,const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-//	vsnprintf(buf, SL_LOG_BUFSIZE, fmt, ap);
+	vsnprintf(buf, SL_LOG_BUFSIZE, fmt, ap);
 	va_end(ap);
-//	TEE_LogPrintf("%s",buf);
+	printf("%s \n",buf);
 	return 0;
 }
 
